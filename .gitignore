@@ -1,7 +1,13 @@
-node_modules/
-.env
-templates/
-uploads/
-dist/
-build/
+# OS
 .DS_Store
+
+# Logs
+*.log
+
+# Backend folders
+certificate-verification-backend/templates/
+certificate-verification-backend/uploads/
+
+# Frontend build output
+certificate-frontend/dist/
+certificate-frontend/build/
