@@ -26,7 +26,7 @@ function App() {
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/templates" element={<Templates />} />
           <Route path="/admin/add" element={<AddCertificate />} />
-          <Route path="/admin/upload-excel" element={<UploadExcel />} />
+          <Route path="/admin/excel" element={<UploadExcel />} />
           <Route path="/admin/upload-template" element={<UploadTemplate />} />
           <Route path="/admin/layout" element={<LayoutConfig />} />
         </Route>

@@ -78,55 +78,83 @@ exports.uploadExcel = (req, res) => {
     return res.status(400).json({ message: "No file uploaded" });
   }
 
+  let data;
+
   try {
-    const data = parseExcel(req.file.path);
+    // ✅ Parse Excel safely
+    data = parseExcel(req.file.path);
+  } catch (error) {
+    console.error("Excel Parse Error:", error);
+    return res.status(400).json({
+      message: "Invalid Excel format",
+      filename: req.file.filename,
+    });
+  }
 
-    db.query(
-      "SELECT certificate_id FROM certificates",
-      (err, existing) => {
-        if (err) return res.status(500).json({ error: err.message });
+  if (!data || data.length === 0) {
+    return res.json({
+      message: "Excel is empty",
+      filename: req.file.filename,
+    });
+  }
 
-        const existingIds = existing.map((c) => c.certificate_id);
+  db.query(
+    "SELECT certificate_id FROM certificates",
+    (err, existing) => {
+      if (err) {
+        console.error("DB Fetch Error:", err);
+        return res.status(500).json({ error: err.message });
+      }
 
-        const filteredData = data.filter(
-          (row) => !existingIds.includes(row.certificate_id)
-        );
+      const existingIds = existing.map((c) => c.certificate_id);
 
-        if (filteredData.length === 0) {
-          fs.unlinkSync(req.file.path);
-          return res.json({ message: "All certificates already exist" });
-        }
+      // ✅ Filter valid + non-duplicate rows
+      const filteredData = data.filter(
+        (row) =>
+          row.certificate_id &&
+          row.student_name &&
+          row.domain &&
+          row.start_date &&
+          row.end_date &&
+          !existingIds.includes(row.certificate_id)
+      );
 
-        const values = filteredData.map((row) => [
-          row.certificate_id,
-          row.student_name,
-          row.domain,
-          row.start_date,
-          row.end_date,
-        ]);
-
-        const insertQuery = `
-          INSERT INTO certificates 
-          (certificate_id, student_name, domain, start_date, end_date)
-          VALUES ?
-        `;
-
-        db.query(insertQuery, [values], (err, result) => {
-          if (err) return res.status(500).json({ error: err.message });
-
-          fs.unlinkSync(req.file.path);
-
-          res.json({
-            message: "Excel uploaded successfully",
-            insertedRows: result.affectedRows,
-            skippedDuplicates: data.length - filteredData.length,
-          });
+      if (filteredData.length === 0) {
+        return res.json({
+          message: "No new valid certificates found",
+          filename: req.file.filename,
         });
       }
-    );
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+
+      const values = filteredData.map((row) => [
+        row.certificate_id,
+        row.student_name,
+        row.domain,
+        row.start_date,
+        row.end_date,
+      ]);
+
+      const insertQuery = `
+        INSERT INTO certificates 
+        (certificate_id, student_name, domain, start_date, end_date)
+        VALUES ?
+      `;
+
+      db.query(insertQuery, [values], (err, result) => {
+        if (err) {
+          console.error("DB Insert Error:", err);
+          return res.status(500).json({ error: err.message });
+        }
+
+        res.json({
+          message: "Excel uploaded successfully",
+          insertedRows: result.affectedRows,
+          skippedDuplicates: data.length - filteredData.length,
+          filename: req.file.filename,
+        });
+      });
+    }
+  );
 };
 
 const { PDFDocument, rgb } = require("pdf-lib");
@@ -332,4 +360,68 @@ exports.deleteTemplate = (req, res) => {
   }
 
   res.status(404).json({ message: "File not found" });
+};
+
+
+exports.getExcelList = (req, res) => {
+  const uploadsDir = path.join(__dirname, "../../uploads");
+
+  if (!fs.existsSync(uploadsDir)) {
+    return res.json({ files: [] });
+  }
+
+  fs.readdir(uploadsDir, (err, files) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const excelFiles = files.filter(file => file.endsWith(".xlsx"));
+
+    res.json({ files: excelFiles });
+  });
+};
+
+exports.deleteExcel = (req, res) => {
+  const file = req.params.filename;
+  const filePath = path.join(__dirname, "../../uploads/", file);
+
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    return res.json({ message: "Excel deleted" });
+  }
+
+  res.status(404).json({ message: "File not found" });
+};
+
+exports.getActiveExcel = (req, res) => {
+  db.query(
+    "SELECT active_file FROM excel_settings WHERE id=1",
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      const active = result[0]?.active_file
+        ? JSON.parse(result[0].active_file)
+        : [];
+
+      res.json({ active });
+    }
+  );
+};
+
+exports.setActiveExcel = (req, res) => {
+  const { files } = req.body; // expect array
+
+  if (!Array.isArray(files)) {
+    return res.status(400).json({ message: "Files must be an array" });
+  }
+
+  const filesString = JSON.stringify(files);
+
+  db.query(
+    "UPDATE excel_settings SET active_file=? WHERE id=1",
+    [filesString],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      res.json({ message: "Active Excel updated" });
+    }
+  );
 };

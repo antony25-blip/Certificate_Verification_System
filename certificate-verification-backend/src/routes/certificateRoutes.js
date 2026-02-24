@@ -1,101 +1,144 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 const certificateController = require("../controllers/certificateController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
+/* =====================================================
+   MULTER CONFIG
+===================================================== */
 
-// ---------------- MULTER CONFIG ----------------
-
-const storage = multer.diskStorage({
+/* ===== Excel Storage ===== */
+const excelStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "templates/");
+    cb(null, path.join(__dirname, "../../uploads"));
+  },
+  filename: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, "../../uploads");
+    const files = fs.readdirSync(uploadPath);
+  
+    const alreadyExists = files.some(f =>
+      f.split("-").slice(1).join("-") === file.originalname
+    );
+  
+    if (alreadyExists) {
+      return cb(new Error("File already exists"), null);
+    }
+  
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const uploadExcel = multer({ storage: excelStorage });
+
+/* ===== Template Storage ===== */
+const templateStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "../../templates"));
   },
   filename: function (req, file, cb) {
     cb(null, file.originalname);
   },
 });
 
-const upload = multer({ storage });
+const uploadTemplate = multer({ storage: templateStorage });
 
+/* =====================================================
+   PROTECTED ROUTES (ADMIN)
+===================================================== */
 
-// =======================================================
-// =============== PROTECTED ROUTES ======================
-// =======================================================
-
-
-// 1️⃣ Upload Excel
-router.post(
-  "/upload",
+/* ===== Excel Routes ===== */
+router.put(
+  "/excel/active",
   authMiddleware,
-  upload.single("file"),
-  certificateController.uploadExcel
+  certificateController.setActiveExcel
 );
 
+router.post("/upload", authMiddleware, (req, res) => {
 
-// 2️⃣ Upload Template
+  uploadExcel.single("file")(req, res, function (err) {
+
+    if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+
+    certificateController.uploadExcel(req, res);
+  });
+
+});
+
+router.get(
+  "/excel/active",
+  authMiddleware,
+  certificateController.getActiveExcel
+);
+
+router.get(
+  "/excel-list",
+  authMiddleware,
+  certificateController.getExcelList
+);
+
+router.delete(
+  "/excel/:filename",
+  authMiddleware,
+  certificateController.deleteExcel
+);
+
+/* ===== Template Routes ===== */
 router.post(
   "/upload-template",
   authMiddleware,
-  upload.single("file"),
+  uploadTemplate.single("file"),
   certificateController.uploadTemplate
 );
-router.delete(
-  "/template/:filename",
-  authMiddleware,
-  certificateController.deleteTemplate
-);
 
-// 3️⃣ Update Layout
-router.put(
-  "/layout",
-  authMiddleware,
-  certificateController.updateLayout
-);
-
-
-// 4️⃣ Get Admin Stats
-router.get(
-  "/admin-stats",
-  authMiddleware,
-  certificateController.getAdminStats
-);
-
-
-// 5️⃣ Get Templates List
 router.get(
   "/templates",
   authMiddleware,
   certificateController.getTemplates
 );
 
+router.delete(
+  "/template/:filename",
+  authMiddleware,
+  certificateController.deleteTemplate
+);
 
-// 6️⃣ Add Certificate
+/* ===== Layout & Stats ===== */
+router.put(
+  "/layout",
+  authMiddleware,
+  certificateController.updateLayout
+);
+
+router.get(
+  "/admin-stats",
+  authMiddleware,
+  certificateController.getAdminStats
+);
+
+/* ===== Add Certificate ===== */
 router.post(
   "/",
   authMiddleware,
   certificateController.addCertificate
 );
 
+/* =====================================================
+   PUBLIC ROUTES (KEEP LAST)
+===================================================== */
 
-// =======================================================
-// =============== PUBLIC ROUTES =========================
-// =======================================================
-
-
-// 7️⃣ Download Certificate
 router.get(
   "/:id/download",
   certificateController.downloadCertificate
 );
 
-
-// 8️⃣ Get Certificate By ID
-// ⚠ MUST BE LAST (dynamic route)
 router.get(
   "/:id",
   certificateController.getCertificate
 );
-
 
 module.exports = router;

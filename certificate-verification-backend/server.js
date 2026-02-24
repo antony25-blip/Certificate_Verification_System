@@ -11,10 +11,8 @@ const port = process.env.PORT || 3000;
 // ===============================
 // ✅ Serve Templates Folder (IMPORTANT)
 // ===============================
-app.use(
-  "/templates",
-  express.static(path.join(__dirname, "templates"))
-);
+app.use("/templates", express.static(path.join(__dirname, "templates")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 
 // ===============================
@@ -23,3 +21,4 @@ app.use(
 app.listen(port, () => {
   console.log(`🚀 Server is running on port ${port}`);
 });
+
