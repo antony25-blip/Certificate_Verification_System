@@ -5,13 +5,17 @@ export default function Templates() {
   const [templates, setTemplates] = useState([]);
   const [active, setActive] = useState("");
   const [preview, setPreview] = useState(null);
+  const [editMode, setEditMode] = useState(false);
 
   const fetchTemplates = async () => {
     const res = await api.get("/certificate/templates", {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
-
-    setTemplates(res.data.templates);
+  
+    // ✅ sort alphabetically so order stays stable
+    const sorted = res.data.templates.sort();
+  
+    setTemplates(sorted);
     setActive(res.data.active);
   };
 
@@ -20,17 +24,23 @@ export default function Templates() {
   }, []);
 
   const handleUpload = async (e) => {
-    const formData = new FormData();
-    formData.append("file", e.target.files[0]);
-
-    await api.post("/certificate/upload-template", formData, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "multipart/form-data",
-      },
-    });
-
-    fetchTemplates();
+    try {
+      const formData = new FormData();
+      formData.append("file", e.target.files[0]);
+  
+      await api.post("/certificate/upload-template", formData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+  
+      // 🔥 Immediately refresh list
+      await fetchTemplates();
+  
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const setAsActive = async (file) => {
@@ -49,7 +59,10 @@ export default function Templates() {
 
   const deleteTemplate = async (file) => {
     if (!window.confirm("Delete this template?")) return;
-
+    if (file === active) {
+      alert("You cannot delete active template");
+      return;
+    }
     await api.delete(`/certificate/template/${file}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
@@ -60,6 +73,18 @@ export default function Templates() {
   return (
     <div style={{ padding: "40px" }}>
       <h2 style={{ marginBottom: "20px" }}>Select Template</h2>
+      <button onClick={() => setEditMode(!editMode)} style={{
+      float: "right",
+      padding: "10px 20px",
+      background: editMode ? "#ef4444" : "#10b981",
+      color: "white",
+      border: "none",
+      borderRadius: "8px",
+      cursor: "pointer",
+  }}
+>
+  {editMode ? "Done" : "Edit"}
+</button>
 
       {/* Upload Button */}
       <label
@@ -118,24 +143,25 @@ export default function Templates() {
             </p>
 
             {/* Delete Button */}
+            {editMode && (
             <button
-              onClick={() => deleteTemplate(file)}
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteTemplate(file);
+              }}
               style={{
                 position: "absolute",
                 top: "10px",
                 right: "10px",
-                background: "red",
-                color: "white",
+                background: "white",
                 border: "none",
-                borderRadius: "50%",
-                width: "30px",
-                height: "30px",
                 cursor: "pointer",
+                fontSize: "18px",
               }}
             >
-              ✕
+              🗑️
             </button>
-
+          )}
             {/* Select Button */}
             <button
               onClick={() => setAsActive(file)}

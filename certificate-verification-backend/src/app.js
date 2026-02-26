@@ -12,5 +12,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/certificate", certificateRoutes);
 app.use("/templates", express.static("templates"));
 app.use("/uploads", express.static("uploads"));
+app.use("/template-previews", express.static("templates/previews"));
 
 module.exports = app;

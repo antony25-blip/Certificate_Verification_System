@@ -1,19 +1,47 @@
 const fs = require("fs");
 const db = require("../config/db");
 const { parseExcel } = require("../utils/excelParser");
-
+const { fromPath } = require("pdf2pic");
 function isValidDate(date) {
   return !isNaN(Date.parse(date));
 }
-exports.uploadTemplate = (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: "No file uploaded" });
-  }
+exports.uploadTemplate = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
 
-  res.json({
-    message: "File uploaded successfully",
-    filename: req.file.filename,
-  });
+    const pdfPath = req.file.path;
+    const outputDir = path.join(__dirname, "../../templates/previews");
+
+    // ✅ Create previews folder automatically
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+      console.log("Previews folder created");
+    }
+
+    const converter = fromPath(pdfPath, {
+      density: 150,
+      saveFilename: path.parse(req.file.filename).name,
+      savePath: outputDir,
+      format: "png",
+      width: 1240,
+      height: 1754,
+    });
+
+    await converter(1); // Convert first page
+
+    console.log("Preview generated successfully");
+
+    res.json({
+      message: "Template uploaded and preview generated",
+      filename: req.file.filename,
+    });
+
+  } catch (err) {
+    console.error("Conversion error:", err);
+    res.status(500).json({ error: err.message });
+  }
 };
 // Add Certificate (Protected)
 exports.addCertificate = (req, res) => {
@@ -276,6 +304,7 @@ exports.updateLayout = (req, res) => {
     end_size,
     name_font,
     body_font,
+    template_file   // ✅ ADD THIS
   } = req.body;
 
   const query = `
@@ -284,7 +313,8 @@ exports.updateLayout = (req, res) => {
       domain_x=?, domain_y=?, domain_size=?,
       start_x=?, start_y=?, start_size=?,
       end_x=?, end_y=?, end_size=?,
-      name_font=?, body_font=?
+      name_font=?, body_font=?,
+      template_file=?    -- ✅ ADD THIS
     WHERE template_name='default'
   `;
 
@@ -295,14 +325,17 @@ exports.updateLayout = (req, res) => {
       domain_x, domain_y, domain_size,
       start_x, start_y, start_size,
       end_x, end_y, end_size,
-      name_font, body_font
+      name_font, body_font,
+      template_file   // ✅ ADD THIS
     ],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
+
       res.json({ message: "Layout updated successfully" });
     }
   );
 };
+
 exports.getAdminStats = (req, res) => {
   const stats = {};
 
