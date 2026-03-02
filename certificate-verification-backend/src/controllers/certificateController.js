@@ -2,6 +2,11 @@ const fs = require("fs");
 const db = require("../config/db");
 const { parseExcel } = require("../utils/excelParser");
 const { fromPath } = require("pdf2pic");
+
+const { PDFDocument, rgb } = require("pdf-lib");
+const path = require("path");
+const fontkit = require("fontkit");
+
 function isValidDate(date) {
   return !isNaN(Date.parse(date));
 }
@@ -24,9 +29,7 @@ exports.uploadTemplate = async (req, res) => {
       density: 150,
       saveFilename: path.parse(req.file.filename).name,
       savePath: outputDir,
-      format: "png",
-      width: 1240,
-      height: 1754,
+      format: "png"
     });
 
     await converter(1); // Convert first page
@@ -185,15 +188,15 @@ exports.uploadExcel = (req, res) => {
   );
 };
 
-const { PDFDocument, rgb } = require("pdf-lib");
-const path = require("path");
-const fontkit = require("fontkit");
+
 
 exports.downloadCertificate = async (req, res) => {
   const { id } = req.params;
 
-  const certQuery = "SELECT * FROM certificates WHERE certificate_id = ?";
-  const layoutQuery = "SELECT * FROM certificate_layouts WHERE template_name = 'default'";
+  const certQuery =
+    "SELECT * FROM certificates WHERE certificate_id = ?";
+  const layoutQuery =
+    "SELECT * FROM certificate_layouts WHERE template_name = 'default'";
 
   db.query(certQuery, [id], (err, certResults) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -205,86 +208,121 @@ exports.downloadCertificate = async (req, res) => {
       if (layoutResults.length === 0)
         return res.status(500).json({ message: "Layout not configured" });
 
-      const certificate = certResults[0];
-      const layout = layoutResults[0];
+      try {
+        const certificate = certResults[0];
+        const layout = layoutResults[0];
 
-      const templatePath = path.join(
-        __dirname,
-        "../../templates/",
-        layout.template_file
-      );
+        const templatePath = path.join(
+          __dirname,
+          "../../templates/",
+          layout.template_file
+        );
 
-      const templateBytes = fs.readFileSync(templatePath);
-      const pdfDoc = await PDFDocument.load(templateBytes);
-      pdfDoc.registerFontkit(fontkit);
+        const templateBytes = fs.readFileSync(templatePath);
+        const pdfDoc = await PDFDocument.load(templateBytes);
+        pdfDoc.registerFontkit(fontkit);
 
-      const page = pdfDoc.getPages()[0];
-      const { width, height } = page.getSize();
+        const page = pdfDoc.getPages()[0];
+        const { width, height } = page.getSize();
 
-      const nameFontBytes = fs.readFileSync(
-        path.join(__dirname, "../../templates/", layout.name_font)
-      );
+        // Load fonts
+        const nameFontBytes = fs.readFileSync(
+          path.join(__dirname, "../../templates/", layout.name_font)
+        );
+        const bodyFontBytes = fs.readFileSync(
+          path.join(__dirname, "../../templates/", layout.body_font)
+        );
 
-      const bodyFontBytes = fs.readFileSync(
-        path.join(__dirname, "../../templates/", layout.body_font)
-      );
+        const nameFont = await pdfDoc.embedFont(nameFontBytes);
+        const bodyFont = await pdfDoc.embedFont(bodyFontBytes);
 
-      const nameFont = await pdfDoc.embedFont(nameFontBytes);
-      const bodyFont = await pdfDoc.embedFont(bodyFontBytes);
+        const start = certificate.start_date.toISOString().split("T")[0];
+        const end = certificate.end_date.toISOString().split("T")[0];
 
-      const start = certificate.start_date.toISOString().split("T")[0];
-      const end = certificate.end_date.toISOString().split("T")[0];
+        /* ================= NAME ================= */
 
-      // ===== NAME =====
-      const name = certificate.student_name;
-      const nameWidth = nameFont.widthOfTextAtSize(name, layout.name_size);
+        const name = certificate.student_name;
+        const nameWidth = nameFont.widthOfTextAtSize(
+          name,
+          layout.name_size
+        );
+        const nameHeight = nameFont.heightAtSize(
+          layout.name_size
+        );
 
-      page.drawText(name, {
-        x: width * layout.name_x - nameWidth / 2,
-        y: height * layout.name_y,
-        size: layout.name_size,
-        font: nameFont,
-        color: rgb(0.75, 0.55, 0.15),
-      });
+        page.drawText(name, {
+          x: width * layout.name_x - nameWidth / 2,
+          y: height * layout.name_y - nameHeight,
+          size: layout.name_size,
+          font: nameFont,
+          color: rgb(0.75, 0.55, 0.15),
+        });
 
-      // ===== DOMAIN =====
-      const domainWidth = bodyFont.widthOfTextAtSize(
-        certificate.domain,
-        layout.domain_size
-      );
+        /* ================= DOMAIN ================= */
 
-      page.drawText(certificate.domain, {
-        x: width * layout.domain_x - domainWidth / 2,
-        y: height * layout.domain_y,
-        size: layout.domain_size,
-        font: bodyFont,
-      });
+        const domain = certificate.domain;
+        const domainWidth = bodyFont.widthOfTextAtSize(
+          domain,
+          layout.domain_size
+        );
+        const domainHeight = bodyFont.heightAtSize(
+          layout.domain_size
+        );
 
-      // ===== START DATE =====
-      page.drawText(start, {
-        x: width * layout.start_x,
-        y: height * layout.start_y,
-        size: layout.start_size,
-        font: bodyFont,
-      });
+        page.drawText(domain, {
+          x: width * layout.domain_x - domainWidth / 2,
+          y: height * layout.domain_y - domainHeight,
+          size: layout.domain_size,
+          font: bodyFont,
+        });
 
-      // ===== END DATE =====
-      page.drawText(end, {
-        x: width * layout.end_x,
-        y: height * layout.end_y,
-        size: layout.end_size,
-        font: bodyFont,
-      });
+        /* ================= START DATE ================= */
 
-      const pdfBytes = await pdfDoc.save();
+        const startWidth = bodyFont.widthOfTextAtSize(
+          start,
+          layout.start_size
+        );
+        const startHeight = bodyFont.heightAtSize(
+          layout.start_size
+        );
 
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename=${id}.pdf`
-      );
-      res.setHeader("Content-Type", "application/pdf");
+        page.drawText(start, {
+          x: width * layout.start_x - startWidth / 2,
+          y: height * layout.start_y - startHeight,
+          size: layout.start_size,
+          font: bodyFont,
+        });
 
-      res.send(Buffer.from(pdfBytes));
+        /* ================= END DATE ================= */
+
+        const endWidth = bodyFont.widthOfTextAtSize(
+          end,
+          layout.end_size
+        );
+        const endHeight = bodyFont.heightAtSize(
+          layout.end_size
+        );
+
+        page.drawText(end, {
+          x: width * layout.end_x - endWidth / 2,
+          y: height * layout.end_y - endHeight,
+          size: layout.end_size,
+          font: bodyFont,
+        });
+
+        const pdfBytes = await pdfDoc.save();
+
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename=${id}.pdf`
+        );
+        res.setHeader("Content-Type", "application/pdf");
+
+        res.send(Buffer.from(pdfBytes));
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+      }
     });
   });
 };
@@ -455,6 +493,21 @@ exports.setActiveExcel = (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
 
       res.json({ message: "Active Excel updated" });
+    }
+  );
+};
+
+exports.getLayout = (req, res) => {
+  db.query(
+    "SELECT * FROM certificate_layouts WHERE template_name='default'",
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Layout not found" });
+      }
+
+      res.json(result[0]);
     }
   );
 };

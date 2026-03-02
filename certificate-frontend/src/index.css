@@ -5,6 +5,56 @@ body {
   color: #1f2937;
 }
 
+@font-face {
+  font-family: "Poppins-SemiBold";
+  src: url("/fonts/Poppins-SemiBold.ttf");
+}
+
+@font-face {
+  font-family: "Poppins-Regular";
+  src: url("/fonts/Poppins-Regular.ttf");
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat.ttf");
+}
+
+@font-face {
+  font-family: "Lora";
+  src: url("/fonts/Lora.ttf");
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url("/fonts/Roboto.ttf");
+}
+
+@font-face {
+  font-family: "Oswald";
+  src: url("/fonts/Oswald.ttf");
+}
+
+@font-face {
+  font-family: "Raleway";
+  src: url("/fonts/Raleway.ttf");
+}
+
+@font-face {
+  font-family: "Merriweather";
+  src: url("/fonts/Merriweather.ttf");
+}
+
+@font-face {
+  font-family: "PlayfairDisplay";
+  src: url("/fonts/PlayfairDisplay.ttf");
+}
+
+@font-face {
+  font-family: "LibreBaskerville";
+  src: url("/fonts/LibreBaskerville.ttf");
+}
+
 .container {
   max-width: 1100px;
   margin: auto;

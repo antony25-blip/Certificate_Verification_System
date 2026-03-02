@@ -108,10 +108,17 @@ router.delete(
 );
 
 /* ===== Layout & Stats ===== */
+
 router.put(
   "/layout",
   authMiddleware,
   certificateController.updateLayout
+);
+
+router.get(
+  "/layout",
+  authMiddleware,
+  certificateController.getLayout
 );
 
 router.get(

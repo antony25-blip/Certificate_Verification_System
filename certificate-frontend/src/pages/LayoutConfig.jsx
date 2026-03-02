@@ -9,89 +9,192 @@ export default function LayoutConfig() {
   const [selectedField, setSelectedField] = useState("name");
   const [coords, setCoords] = useState({ x: 0, y: 0 });
 
+  /* ============================
+     FONT LIST (10 Fonts)
+  ============================ */
+  const fontList = [
+    "Poppins-SemiBold.ttf",
+    "Poppins-Regular.ttf",
+    "Montserrat.ttf",
+    "Lora.ttf",
+    "Roboto.ttf",
+    "Oswald.ttf",
+    "Raleway.ttf",
+    "Merriweather.ttf",
+    "PlayfairDisplay.ttf",
+    "LibreBaskerville.ttf"
+  ];
+
+  /* ============================
+     FIELD CONFIGURATION MAP
+  ============================ */
+  const fieldMap = {
+    name: {
+      label: "Sample Name",
+      x: "name_x",
+      y: "name_y",
+      size: "name_size",
+      font: "name_font"
+    },
+    domain: {
+      label: "Sample Domain",
+      x: "domain_x",
+      y: "domain_y",
+      size: "domain_size",
+      font: "body_font"
+    },
+    start: {
+      label: "01 January 2025",
+      x: "start_x",
+      y: "start_y",
+      size: "start_size",
+      font: "body_font"
+    },
+    end: {
+      label: "31 January 2025",
+      x: "end_x",
+      y: "end_y",
+      size: "end_size",
+      font: "body_font"
+    }
+  };
+
+  /* ============================
+     FORM STATE
+  ============================ */
   const [form, setForm] = useState({
     name_x: 0.5,
     name_y: 0.6,
     name_size: 42,
+
     domain_x: 0.5,
     domain_y: 0.5,
     domain_size: 18,
+
     start_x: 0.4,
     start_y: 0.45,
     start_size: 16,
+
     end_x: 0.6,
     end_y: 0.45,
     end_size: 16,
+
     name_font: "Poppins-SemiBold.ttf",
-    body_font: "Poppins-Regular.ttf",
+    body_font: "Poppins-Regular.ttf"
   });
 
-  // 🔥 Fetch Active Template
+  /* ============================
+     FETCH ACTIVE TEMPLATE
+  ============================ */
   useEffect(() => {
-    const fetchActiveTemplate = async () => {
-      const res = await api.get("/certificate/templates", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+    const fetchData = async () => {
+      const token = localStorage.getItem("token");
+  
+      // Fetch active template
+      const templateRes = await api.get("/certificate/templates", {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      setActiveTemplate(res.data.active);
+  
+      setActiveTemplate(templateRes.data.active);
+  
+      // Fetch saved layout
+      const layoutRes = await api.get("/certificate/layout", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+  
+      const data = layoutRes.data;
+  
+      setForm({
+        name_x: data.name_x,
+        name_y: data.name_y,
+        name_size: data.name_size,
+  
+        domain_x: data.domain_x,
+        domain_y: data.domain_y,
+        domain_size: data.domain_size,
+  
+        start_x: data.start_x,
+        start_y: data.start_y,
+        start_size: data.start_size,
+  
+        end_x: data.end_x,
+        end_y: data.end_y,
+        end_size: data.end_size,
+  
+        name_font: data.name_font,
+        body_font: data.body_font
+      });
     };
-
-    fetchActiveTemplate();
+  
+    fetchData();
   }, []);
 
-  // 🔥 Mouse Move Logic
+  /* ============================
+     MOUSE MOVE (SHOW COORDS)
+  ============================ */
   const handleMouseMove = (e) => {
     const rect = previewRef.current.getBoundingClientRect();
-
+  
     const x = (e.clientX - rect.left) / rect.width;
+  
+    // invert here only once
     const y = 1 - (e.clientY - rect.top) / rect.height;
-
+  
     setCoords({
       x: x.toFixed(3),
-      y: y.toFixed(3),
+      y: y.toFixed(3)
     });
   };
 
-  // 🔥 Click to Set Position
+  /* ============================
+     CLICK TO SET POSITION
+  ============================ */
   const handleClick = () => {
-    const updated = { ...form };
-
-    updated[`${selectedField}_x`] = coords.x;
-    updated[`${selectedField}_y`] = coords.y;
-
-    setForm(updated);
+    setForm({
+      ...form,
+      [fieldMap[selectedField].x]: parseFloat(coords.x),
+      [fieldMap[selectedField].y]: parseFloat(coords.y)
+    });
   };
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
+  /* ============================
+     SAVE LAYOUT
+  ============================ */
   const submit = async (e) => {
     e.preventDefault();
-  
+
     await api.put(
       "/certificate/layout",
       {
         ...form,
-        template_file: activeTemplate   // 🔥 ADD THIS LINE
+        template_file: activeTemplate
       },
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        }
       }
     );
-  
+
     alert("Layout Updated Successfully!");
   };
+
+  /* ============================
+     GET CURRENT FIELD
+  ============================ */
+  const currentField = fieldMap[selectedField];
+
+  /* Convert .ttf → CSS font name */
+  const cssFontName = form[currentField.font].replace(".ttf", "");
+
   return (
     <>
       <Navbar />
 
       <div style={{ display: "flex", padding: "40px", gap: "40px" }}>
-        {/* LEFT SIDE - TEMPLATE PREVIEW */}
+        {/* ============================
+            LEFT SIDE - PREVIEW
+        ============================ */}
         <div style={{ flex: 2 }}>
           <h3>Template Preview</h3>
 
@@ -103,16 +206,52 @@ export default function LayoutConfig() {
               style={{
                 position: "relative",
                 border: "2px solid #2563eb",
-                cursor: "crosshair",
+                cursor: "crosshair"
               }}
             >
               <img
-                src={`http://localhost:3000/template-previews/${activeTemplate.replace(".pdf", ".1.png")}`}
+                src={`http://localhost:3000/template-previews/${activeTemplate.replace(
+                  ".pdf",
+                  ".1.png"
+                )}`}
                 alt="template"
-                style={{ width: "100%", display: "block" }}
+                style={{
+                  width: "100%",
+                  display: "block",
+                  objectFit: "contain"
+                }}
               />
 
-              {/* Live Coordinates Display */}
+              {/* 🔥 SHOW ALL SAMPLE TEXTS */}
+              {Object.keys(fieldMap).map((key) => {
+                const field = fieldMap[key];
+                const fontName = form[field.font].replace(".ttf", "");
+
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      position: "absolute",
+                      left: `${form[field.x] * 100}%`,
+                      top: `${(1 - form[field.y]) * 100}%`,
+                      transform: "translate(-50%, -100%)",
+                      fontSize: `${form[field.size]}px`,
+                      fontFamily: fontName,
+                      color: key === "name" ? "#b8860b" : "#000",
+                      pointerEvents: "none",
+                      border: selectedField === key ? "1px dashed red" : "none",
+                      padding: "2px 6px"
+                    }}
+                  >
+                    {field.label}
+                  </div>
+                );
+              })}
+
+              {/* 🔥 LIVE SAMPLE TEXT */}
+              
+
+              {/* COORDINATE DISPLAY */}
               <div
                 style={{
                   position: "absolute",
@@ -122,7 +261,7 @@ export default function LayoutConfig() {
                   color: "white",
                   padding: "5px 10px",
                   borderRadius: "6px",
-                  fontSize: "12px",
+                  fontSize: "12px"
                 }}
               >
                 X: {coords.x} | Y: {coords.y}
@@ -131,15 +270,16 @@ export default function LayoutConfig() {
           )}
         </div>
 
-        {/* RIGHT SIDE - INPUT PANEL */}
+        {/* ============================
+            RIGHT SIDE - CONTROLS
+        ============================ */}
         <div style={{ flex: 1 }}>
           <h3>Layout Controls</h3>
 
-          {/* Field Selector */}
           <select
             value={selectedField}
             onChange={(e) => setSelectedField(e.target.value)}
-            style={{ marginBottom: "20px", padding: "8px" }}
+            style={{ marginBottom: "20px", padding: "8px", width: "100%" }}
           >
             <option value="name">Name</option>
             <option value="domain">Domain</option>
@@ -147,31 +287,74 @@ export default function LayoutConfig() {
             <option value="end">End Date</option>
           </select>
 
-          {Object.keys(form).map((key) => (
+          <label>X</label>
+          <input
+            type="number"
+            step="0.001"
+            value={form[currentField.x]}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                [currentField.x]: parseFloat(e.target.value)
+              })
+            }
+            style={{ width: "100%", marginBottom: "15px", padding: "8px" }}
+          />
+
+          <label>Y</label>
+          <input
+            type="number"
+            step="0.001"
+            value={form[currentField.y]}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                [currentField.y]: parseFloat(e.target.value)
+              })
+            }
+            style={{ width: "100%", marginBottom: "15px", padding: "8px" }}
+          />
+
+          <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+            <select
+              value={form[currentField.font]}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  [currentField.font]: e.target.value
+                })
+              }
+              style={{ flex: 1, padding: "8px" }}
+            >
+              {fontList.map((font) => (
+                <option key={font} value={font}>
+                  {font.replace(".ttf", "")}
+                </option>
+              ))}
+            </select>
+
             <input
-              key={key}
-              name={key}
-              value={form[key]}
-              placeholder={key}
-              onChange={handleChange}
-              style={{
-                width: "100%",
-                marginBottom: "10px",
-                padding: "8px",
-              }}
+              type="number"
+              value={form[currentField.size]}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  [currentField.size]: parseInt(e.target.value)
+                })
+              }
+              style={{ width: "90px", padding: "8px" }}
             />
-          ))}
+          </div>
 
           <button
             onClick={submit}
             style={{
-              marginTop: "20px",
               padding: "10px",
               width: "100%",
               background: "#10b981",
               color: "white",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: "6px"
             }}
           >
             Save Layout
