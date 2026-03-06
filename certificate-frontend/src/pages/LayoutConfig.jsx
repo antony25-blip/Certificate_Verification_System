@@ -89,43 +89,43 @@ export default function LayoutConfig() {
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem("token");
-  
+
       // Fetch active template
       const templateRes = await api.get("/certificate/templates", {
         headers: { Authorization: `Bearer ${token}` }
       });
-  
+
       setActiveTemplate(templateRes.data.active);
-  
+
       // Fetch saved layout
       const layoutRes = await api.get("/certificate/layout", {
         headers: { Authorization: `Bearer ${token}` }
       });
-  
+
       const data = layoutRes.data;
-  
+
       setForm({
         name_x: data.name_x,
         name_y: data.name_y,
         name_size: data.name_size,
-  
+
         domain_x: data.domain_x,
         domain_y: data.domain_y,
         domain_size: data.domain_size,
-  
+
         start_x: data.start_x,
         start_y: data.start_y,
         start_size: data.start_size,
-  
+
         end_x: data.end_x,
         end_y: data.end_y,
         end_size: data.end_size,
-  
+
         name_font: data.name_font,
         body_font: data.body_font
       });
     };
-  
+
     fetchData();
   }, []);
 
@@ -134,12 +134,12 @@ export default function LayoutConfig() {
   ============================ */
   const handleMouseMove = (e) => {
     const rect = previewRef.current.getBoundingClientRect();
-  
+
     const x = (e.clientX - rect.left) / rect.width;
-  
+
     // invert here only once
     const y = 1 - (e.clientY - rect.top) / rect.height;
-  
+
     setCoords({
       x: x.toFixed(3),
       y: y.toFixed(3)
@@ -206,7 +206,9 @@ export default function LayoutConfig() {
               style={{
                 position: "relative",
                 border: "2px solid #2563eb",
-                cursor: "crosshair"
+                cursor: "crosshair",
+                display: "inline-block", // 🔥 WRAP IMAGE EXACTLY
+                lineHeight: 0
               }}
             >
               <img
@@ -216,9 +218,8 @@ export default function LayoutConfig() {
                 )}`}
                 alt="template"
                 style={{
-                  width: "100%",
-                  display: "block",
-                  objectFit: "contain"
+                  maxWidth: "100%",
+                  display: "block"
                 }}
               />
 
@@ -249,7 +250,7 @@ export default function LayoutConfig() {
               })}
 
               {/* 🔥 LIVE SAMPLE TEXT */}
-              
+
 
               {/* COORDINATE DISPLAY */}
               <div

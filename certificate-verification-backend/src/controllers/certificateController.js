@@ -52,15 +52,15 @@ exports.addCertificate = (req, res) => {
 
   // Basic validation
   if (!isValidDate(start_date) || !isValidDate(end_date)) {
-  return res.status(400).json({ message: "Invalid date format" });
-}
+    return res.status(400).json({ message: "Invalid date format" });
+  }
   if (!certificate_id || !student_name || !domain || !start_date || !end_date) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
   // Check duplicate first
   const checkQuery = "SELECT * FROM certificates WHERE certificate_id = ?";
-  
+
   db.query(checkQuery, [certificate_id], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
 
@@ -236,8 +236,16 @@ exports.downloadCertificate = async (req, res) => {
         const nameFont = await pdfDoc.embedFont(nameFontBytes);
         const bodyFont = await pdfDoc.embedFont(bodyFontBytes);
 
-        const start = certificate.start_date.toISOString().split("T")[0];
-        const end = certificate.end_date.toISOString().split("T")[0];
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        const startDateObj = new Date(certificate.start_date);
+        const endDateObj = new Date(certificate.end_date);
+
+        const start = startDateObj.toLocaleDateString('en-GB', options);
+        const end = endDateObj.toLocaleDateString('en-GB', options);
+
+        console.log(`Generating certificate for ${id}`);
+        console.log(`Layout: x=${layout.name_x}, y=${layout.name_y}`);
+        console.log(`Dates: ${start} to ${end}`);
 
         /* ================= NAME ================= */
 
@@ -252,7 +260,7 @@ exports.downloadCertificate = async (req, res) => {
 
         page.drawText(name, {
           x: width * layout.name_x - nameWidth / 2,
-          y: height * layout.name_y - nameHeight,
+          y: height * layout.name_y + (layout.name_size * 0.05), // Small bump for baseline
           size: layout.name_size,
           font: nameFont,
           color: rgb(0.75, 0.55, 0.15),
@@ -271,7 +279,7 @@ exports.downloadCertificate = async (req, res) => {
 
         page.drawText(domain, {
           x: width * layout.domain_x - domainWidth / 2,
-          y: height * layout.domain_y - domainHeight,
+          y: height * layout.domain_y + (layout.domain_size * 0.05),
           size: layout.domain_size,
           font: bodyFont,
         });
@@ -288,7 +296,7 @@ exports.downloadCertificate = async (req, res) => {
 
         page.drawText(start, {
           x: width * layout.start_x - startWidth / 2,
-          y: height * layout.start_y - startHeight,
+          y: height * layout.start_y + (layout.start_size * 0.05),
           size: layout.start_size,
           font: bodyFont,
         });
@@ -305,7 +313,7 @@ exports.downloadCertificate = async (req, res) => {
 
         page.drawText(end, {
           x: width * layout.end_x - endWidth / 2,
-          y: height * layout.end_y - endHeight,
+          y: height * layout.end_y + (layout.end_size * 0.05),
           size: layout.end_size,
           font: bodyFont,
         });
@@ -327,51 +335,35 @@ exports.downloadCertificate = async (req, res) => {
   });
 };
 exports.updateLayout = (req, res) => {
-  const {
-    name_x,
-    name_y,
-    name_size,
-    domain_x,
-    domain_y,
-    domain_size,
-    start_x,
-    start_y,
-    start_size,
-    end_x,
-    end_y,
-    end_size,
-    name_font,
-    body_font,
-    template_file   // ✅ ADD THIS
-  } = req.body;
+  const fields = [
+    "name_x", "name_y", "name_size",
+    "domain_x", "domain_y", "domain_size",
+    "start_x", "start_y", "start_size",
+    "end_x", "end_y", "end_size",
+    "name_font", "body_font",
+    "template_file"
+  ];
 
-  const query = `
-    UPDATE certificate_layouts SET
-      name_x=?, name_y=?, name_size=?,
-      domain_x=?, domain_y=?, domain_size=?,
-      start_x=?, start_y=?, start_size=?,
-      end_x=?, end_y=?, end_size=?,
-      name_font=?, body_font=?,
-      template_file=?    -- ✅ ADD THIS
-    WHERE template_name='default'
-  `;
+  const updates = [];
+  const values = [];
 
-  db.query(
-    query,
-    [
-      name_x, name_y, name_size,
-      domain_x, domain_y, domain_size,
-      start_x, start_y, start_size,
-      end_x, end_y, end_size,
-      name_font, body_font,
-      template_file   // ✅ ADD THIS
-    ],
-    (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-
-      res.json({ message: "Layout updated successfully" });
+  fields.forEach(field => {
+    if (req.body[field] !== undefined) {
+      updates.push(`${field}=?`);
+      values.push(req.body[field]);
     }
-  );
+  });
+
+  if (updates.length === 0) {
+    return res.status(400).json({ message: "No fields to update" });
+  }
+
+  const query = `UPDATE certificate_layouts SET ${updates.join(', ')} WHERE template_name='default'`;
+
+  db.query(query, values, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: "Layout updated successfully" });
+  });
 };
 
 exports.getAdminStats = (req, res) => {
